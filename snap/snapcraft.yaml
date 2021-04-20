@@ -1,6 +1,6 @@
 name: test-my-ruby-plugin
 base: core20
-version: '0.1.27'
+version: '0.1.29'
 summary: Test my ruby plugin
 description: |
   Foo bar
@@ -44,5 +44,5 @@ apps:
     command: bin/hello-world
   print-env:
     command: bin/print-env
-  print-env-bare:
-    command: bin/ruby.bare $SNAP/bin/print-env
+  gem-env:
+    command: bin/gem env

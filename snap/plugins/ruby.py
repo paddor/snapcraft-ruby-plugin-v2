@@ -6,6 +6,7 @@ import os
 import re
 import logging
 
+from textwrap import dedent
 from typing import Any, Dict, List, Set
 from snapcraft.plugins.v2 import PluginV2
 
@@ -21,7 +22,7 @@ class PluginImpl(PluginV2):
                 "ruby-version": {
                     "type": "string",
                     "default": "3.0.1",
-                    "pattern": r"^\d+\.\d+(\.\d+)?$",
+                    "pattern": r"^\d+\.\d+\.\d+$",
                 },
                 "use-bundler": {
                     "type": "boolean",
@@ -49,11 +50,8 @@ class PluginImpl(PluginV2):
     def get_build_environment(self) -> Dict[str, str]:
         return {
             "PATH": "${SNAPCRAFT_PART_INSTALL}/bin:${PATH}",
-            "RUBYLIB": "${SNAPCRAFT_PART_INSTALL}/lib/ruby/snap:/root/parts/my-snap-test/install/lib/ruby/snap/x86_64-linux/", # TODO: support any arch
-            "LD_LIBRARY_PATH": "${SNAPCRAFT_PART_INSTALL}/lib:${LD_LIBRARY_PATH}",
+            "LD_LIBRARY_PATH": "${SNAPCRAFT_PART_INSTALL}/lib:${LD_LIBRARY_PATH}", # for finding ruby.so
         }
-            # "GEM_HOME": "${SNAPCRAFT_PART_INSTALL}/lib/ruby/gems/snap",
-            # "GEM_PATH": "${SNAPCRAFT_PART_INSTALL}/lib/ruby/gems/snap",
 
     def _get_download_command(self) -> str:
         ruby_version = self.options.ruby_version
@@ -71,12 +69,10 @@ class PluginImpl(PluginV2):
     def _configure_opts(self) -> List[str]:
         configure_opts = [
             "--without-baseruby",
+            "--enable-load-relative",
             "--enable-shared",
             "--prefix=/",
-            "--with-ruby-version=snap",
             "--disable-install-doc",
-            "--with-vendordir=no",
-            "--with-sitedir=no",
             ]
 
         if self.options.use_jemalloc:
@@ -87,18 +83,20 @@ class PluginImpl(PluginV2):
     def _get_install_commands(self) -> List[str]:
         commands = []
         commands.append("tar xf ${SNAPCRAFT_PART_SRC}/ruby.tar.gz")
-        commands.append("pushd ruby-*")
+        commands.append("pushd ruby-{}".format(self.options.ruby_version))
         commands.append("./configure {}".format(' '.join(self._configure_opts())))
         commands.append("make -j${SNAPCRAFT_PARALLEL_BUILD_COUNT}")
         commands.append("make install DESTDIR=${SNAPCRAFT_PART_INSTALL}")
         commands.append("popd")
         commands.append("sed -i -e 's,^#!.*ruby,#!/usr/bin/env ruby,' ${SNAPCRAFT_PART_INSTALL}/bin/*")
-        commands.append("mv ${SNAPCRAFT_PART_INSTALL}/bin/{ruby,ruby.bare}")
-        commands.append("cp ${SNAPCRAFT_PART_SRC}/ruby ${SNAPCRAFT_PART_INSTALL}/bin/")
-        commands.append("gem install --env-shebang bundler")
 
-        # TODO: add commands that create wrapper script which supports any arch,
-        #       or remove need for wrapper script entirely.
+        # NOTE: Avoid conflicts/prompts about replacing bundler executables entirely by removing them first.
+        commands.append(dedent(
+        """\
+        rm -f ${SNAPCRAFT_PART_INSTALL}/bin/bundle ${SNAPCRAFT_PART_INSTALL}/bin/bundler
+        gem install --env-shebang bundler
+        """))
+        commands.append("bundle version")
 
         if self.options.use_bundler:
             commands.append("bundle")
