@@ -1,0 +1,48 @@
+name: test-my-ruby-plugin
+base: core20
+version: '0.1.27'
+summary: Test my ruby plugin
+description: |
+  Foo bar
+
+grade: stable
+confinement: strict
+
+parts:
+  my-snap-test:
+    source: .
+    plugin: ruby
+    use-bundler: true
+    # use-jemalloc: true
+    # stage-packages: [libjemalloc2]
+    stage:
+      - -include
+      - -share/man
+      - -usr/share/doc
+      - -lib/ruby/gems/snap/doc
+      - -bin/typeprof
+      - -bin/bundler
+      - -bin/erb
+      - -bin/racc
+      - -bin/rake
+      - -bin/rbs
+      - -bin/rdoc
+      - -bin/ri
+
+
+  print-env:
+    plugin: dump
+    source: .
+    organize:
+      print-env.rb: bin/print-env
+    prime:
+      - bin/print-env
+
+
+apps:
+  test-my-ruby-plugin:
+    command: bin/hello-world
+  print-env:
+    command: bin/print-env
+  print-env-bare:
+    command: bin/ruby.bare $SNAP/bin/print-env
