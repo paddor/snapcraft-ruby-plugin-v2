@@ -71,7 +71,7 @@ class PluginImpl(PluginV2):
             "--without-baseruby",
             "--enable-load-relative",
             "--enable-shared",
-            "--prefix=/",
+            "--prefix=${SNAPCRAFT_PART_INSTALL}",
             "--disable-install-doc",
             ]
 
@@ -86,17 +86,13 @@ class PluginImpl(PluginV2):
         commands.append("pushd ruby-{}".format(self.options.ruby_version))
         commands.append("./configure {}".format(' '.join(self._configure_opts())))
         commands.append("make -j${SNAPCRAFT_PARALLEL_BUILD_COUNT}")
-        commands.append("make install DESTDIR=${SNAPCRAFT_PART_INSTALL}")
+        commands.append("make install")
         commands.append("popd")
-        commands.append("sed -i -e 's,^#!.*ruby,#!/usr/bin/env ruby,' ${SNAPCRAFT_PART_INSTALL}/bin/*")
 
-        # NOTE: Avoid conflicts/prompts about replacing bundler executables entirely by removing them first.
-        commands.append(dedent(
-        """\
-        rm -f ${SNAPCRAFT_PART_INSTALL}/bin/bundle ${SNAPCRAFT_PART_INSTALL}/bin/bundler
-        gem install --env-shebang bundler
-        """))
-        commands.append("bundle version")
+        # NOTE: Update bundler. Avoid conflicts/prompts about replacing bundler
+        #       executables by removing them first.
+        commands.append("rm -f ${SNAPCRAFT_PART_INSTALL}/bin/{bundle,bundler}")
+        commands.append("gem install --env-shebang --no-document bundler")
 
         if self.options.use_bundler:
             commands.append("bundle")
