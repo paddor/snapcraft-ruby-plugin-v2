@@ -6,7 +6,6 @@ import os
 import re
 import logging
 
-from textwrap import dedent
 from typing import Any, Dict, List, Set
 from snapcraft.plugins.v2 import PluginV2
 
