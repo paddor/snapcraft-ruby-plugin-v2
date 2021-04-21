@@ -1,6 +1,6 @@
 name: test-my-ruby-plugin
 base: core20
-version: '0.1.29'
+version: '0.1.32'
 summary: Test my ruby plugin
 description: |
   Foo bar
@@ -13,13 +13,15 @@ parts:
     source: .
     plugin: ruby
     use-bundler: true
-    # use-jemalloc: true
-    # stage-packages: [libjemalloc2]
+    ruby-version: "3.0"
+    use-jemalloc: true
+    stage-packages:
+      - libjemalloc2
     stage:
       - -include
       - -share/man
       - -usr/share/doc
-      - -lib/ruby/gems/snap/doc
+      - -lib/ruby/gems/*/doc
       - -bin/typeprof
       - -bin/bundler
       - -bin/erb
@@ -46,3 +48,5 @@ apps:
     command: bin/print-env
   gem-env:
     command: bin/gem env
+  irb:
+    command: bin/irb

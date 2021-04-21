@@ -18,10 +18,14 @@ class PluginImpl(PluginV2):
             "type": "object",
             "additionalProperties": False,
             "properties": {
+                "ruby-flavor": {
+                    "type": "string",
+                    "default": "ruby",
+                },
                 "ruby-version": {
                     "type": "string",
                     "default": "3.0.1",
-                    "pattern": r"^\d+\.\d+\.\d+$",
+                    "pattern": r"^\d+\.\d+(\.\d+)?$",
                 },
                 "use-bundler": {
                     "type": "boolean",
@@ -39,7 +43,7 @@ class PluginImpl(PluginV2):
         return set()
 
     def get_build_packages(self) -> Set[str]:
-        packages = {"gcc", "curl", "make", "zlib1g-dev", "libssl-dev", "libreadline-dev"}
+        packages = {"curl", "jq"}
 
         if self.options.use_jemalloc:
             packages.add("libjemalloc-dev")
@@ -52,25 +56,12 @@ class PluginImpl(PluginV2):
             "LD_LIBRARY_PATH": "${SNAPCRAFT_PART_INSTALL}/lib:${LD_LIBRARY_PATH}", # for finding ruby.so
         }
 
-    def _get_download_command(self) -> str:
-        ruby_version = self.options.ruby_version
-        feature_pattern = re.compile(r"^(\d+\.\d+)\..*$")
-        feature_version = feature_pattern.sub(r"\1", ruby_version)
-        url = "https://cache.ruby-lang.org/pub/ruby/{}/ruby-{}.tar.xz".format(
-            feature_version,
-            ruby_version
-        )
-        command = f"curl --proto '=https' --tlsv1.2 -C - -f {url} > ${{SNAPCRAFT_PART_SRC}}/ruby.tar.gz"
-
-        return command
-
-
     def _configure_opts(self) -> List[str]:
+        # TODO: options for other Ruby flavors
         configure_opts = [
             "--without-baseruby",
             "--enable-load-relative",
             "--enable-shared",
-            "--prefix=${SNAPCRAFT_PART_INSTALL}",
             "--disable-install-doc",
             ]
 
@@ -81,12 +72,12 @@ class PluginImpl(PluginV2):
 
     def _get_install_commands(self) -> List[str]:
         commands = []
-        commands.append("tar xf ${SNAPCRAFT_PART_SRC}/ruby.tar.gz")
-        commands.append("pushd ruby-{}".format(self.options.ruby_version))
-        commands.append("./configure {}".format(' '.join(self._configure_opts())))
-        commands.append("make -j${SNAPCRAFT_PARALLEL_BUILD_COUNT}")
-        commands.append("make install")
-        commands.append("popd")
+        commands.append("ruby_install_url=$(curl -L --proto '=https' --tlsv1.2 'https://api.github.com/repos/postmodern/ruby-install/tags' | jq -r '.[0].tarball_url')")
+        commands.append("curl -L --proto '=https' --tlsv1.2 $ruby_install_url | tar xz")
+        commands.append("postmodern-ruby-install-*/bin/ruby-install -i ${{SNAPCRAFT_PART_INSTALL}} --package-manager apt -j${{SNAPCRAFT_PARALLEL_BUILD_COUNT}} {}-{} -- {}".format(
+            self.options.ruby_flavor,
+            self.options.ruby_version,
+            ' '.join(self._configure_opts())))
 
         # NOTE: Update bundler. Avoid conflicts/prompts about replacing bundler
         #       executables by removing them first.
@@ -102,6 +93,5 @@ class PluginImpl(PluginV2):
 
     def get_build_commands(self) -> List[str]:
         commands = []
-        commands.append(self._get_download_command())
         commands.extend(self._get_install_commands())
         return commands
